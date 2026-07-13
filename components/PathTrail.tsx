@@ -56,9 +56,10 @@ interface TargetBannerProps {
   startTitle: string
   clicks: number
   elapsed: number
+  hideStats?: boolean
 }
 
-export function TargetBanner({ targetTitle, startTitle, clicks, elapsed }: TargetBannerProps) {
+export function TargetBanner({ targetTitle, startTitle, clicks, elapsed, hideStats }: TargetBannerProps) {
   const m = Math.floor(elapsed / 60).toString().padStart(2, '0')
   const s = (elapsed % 60).toString().padStart(2, '0')
 
@@ -108,10 +109,12 @@ export function TargetBanner({ targetTitle, startTitle, clicks, elapsed }: Targe
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '28px' }}>
-        <Stat label="Clics" value={String(clicks)} />
-        <Stat label="Temps" value={`${m}:${s}`} accent />
-      </div>
+      {!hideStats && (
+        <div style={{ display: 'flex', gap: '28px', flexShrink: 0 }}>
+          <Stat label="Clics" value={String(clicks)} />
+          <Stat label="Temps" value={`${m}:${s}`} accent />
+        </div>
+      )}
     </div>
   )
 }
@@ -127,7 +130,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
       </div>
       <div style={{
         fontSize: '22px', fontWeight: 700, color: accent ? 'var(--accent)' : 'var(--text1)',
-        fontFamily: F,
+        fontFamily: F, fontVariantNumeric: 'tabular-nums',
       }}>
         {value}
       </div>

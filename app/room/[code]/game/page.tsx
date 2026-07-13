@@ -61,11 +61,17 @@ export default function GamePage() {
   const [confirmStop, setConfirmStop] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [myPath, setMyPath] = useState<string[]>([])
 
   const channelRef = useRef<RealtimeChannel | null>(null)
   const startTimeRef = useRef<number | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const myPlayerIdRef = useRef<string | null>(null)
+  const roomRef = useRef<Room | null>(null)
+  const articleScrollRef = useRef<HTMLDivElement | null>(null)
+
+  // Keep roomRef in sync for callbacks
+  useEffect(() => { roomRef.current = room }, [room])
 
   const loadInitialData = useCallback(async () => {
     const playerId = sessionStorage.getItem('wikiroad_player_id')
@@ -81,6 +87,7 @@ export default function GamePage() {
 
     const me = all.find(p => p.id === playerId) ?? null
     setMyPlayer(me)
+    if (me?.path) setMyPath(me.path)
 
     if (roomData.started_at) {
       startTimeRef.current = new Date(roomData.started_at).getTime()
@@ -150,6 +157,23 @@ export default function GamePage() {
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
   }, [room, code])
 
+  // Clicks mode: detect all finished
+  useEffect(() => {
+    if (!room || room.win_condition !== 'clicks' || gameFinished) return
+    if (players.length === 0) return
+    const allDone = players.every(p => p.status === 'finished')
+    if (allDone) {
+      if (timerRef.current) clearInterval(timerRef.current)
+      const sorted = [...players].sort((a, b) => (a.clicks ?? 999) - (b.clicks ?? 999))
+      setWinner(sorted[0])
+      setGameFinished(true)
+      supabase.from('rooms')
+        .update({ status: 'finished', finished_at: new Date().toISOString() })
+        .eq('id', room.id)
+        .then(() => {})
+    }
+  }, [players, room, gameFinished])
+
   const handleLinkClick = useCallback(async (url: string, _title: string) => {
     if (!myPlayer || won || gameFinished) return
 
@@ -161,9 +185,9 @@ export default function GamePage() {
       setPageTitle(title)
 
       const newPath = [...(myPlayer.path ?? []), title]
-      const targetUrl = room?.target_url ?? ''
+      const targetUrl = roomRef.current?.target_url ?? ''
       const isTarget = url.toLowerCase() === decodeURIComponent(targetUrl).toLowerCase()
-        || title.toLowerCase() === (room?.target_title ?? '').toLowerCase()
+        || title.toLowerCase() === (roomRef.current?.target_title ?? '').toLowerCase()
 
       const updateData: Partial<Player> = {
         current_title: title, current_url: url, clicks: newClicks, path: newPath,
@@ -178,6 +202,7 @@ export default function GamePage() {
         updateData.finished_at = new Date().toISOString()
         updateData.rank = rank
         setWon(true)
+        setMyPath(newPath)
 
         await supabase.from('players').update(updateData).eq('id', myPlayer.id)
         setMyPlayer(prev => prev ? { ...prev, ...updateData } as Player : null)
@@ -187,19 +212,26 @@ export default function GamePage() {
           payload: { type: 'player_finished', player_id: myPlayer.id, clicks: newClicks, time_ms: timeMs, rank } as GameEvent,
         })
 
-        if (room?.win_condition === 'first' || rank === 1) {
-          await supabase.from('rooms').update({ status: 'finished', finished_at: new Date().toISOString() }).eq('id', room!.id)
+        const wc = roomRef.current?.win_condition
+        if (wc === 'first' || wc === 'time') {
+          await supabase.from('rooms').update({ status: 'finished', finished_at: new Date().toISOString() }).eq('id', roomRef.current!.id)
           channelRef.current?.send({
             type: 'broadcast', event: 'game_event',
             payload: { type: 'game_finished', winner_id: myPlayer.id } as GameEvent,
           })
-          setWinner({ ...myPlayer, ...updateData } as Player)
+          const finishedMe = { ...myPlayer, ...updateData } as Player
+          setWinner(finishedMe)
           setGameFinished(true)
           if (timerRef.current) clearInterval(timerRef.current)
         }
+        // clicks mode: won=true, wait for all_finished useEffect
       } else {
         await supabase.from('players').update(updateData).eq('id', myPlayer.id)
-        setMyPlayer(prev => prev ? { ...prev, ...updateData } as Player : null)
+        setMyPlayer(prev => {
+          const updated = prev ? { ...prev, ...updateData } as Player : null
+          return updated
+        })
+        setMyPath(newPath)
 
         channelRef.current?.send({
           type: 'broadcast', event: 'game_event',
@@ -209,9 +241,9 @@ export default function GamePage() {
     } catch { /* silent */ }
     finally {
       setLoadingPage(false)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      if (articleScrollRef.current) articleScrollRef.current.scrollTop = 0
     }
-  }, [myPlayer, won, gameFinished, room, players])
+  }, [myPlayer, won, gameFinished, players])
 
   async function handleStop() {
     if (!room || !myPlayer?.is_host) return
@@ -236,11 +268,14 @@ export default function GamePage() {
   const s = (elapsed % 60).toString().padStart(2, '0')
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg0)', color: 'var(--text1)', fontFamily: F }}>
-      {/* Sticky header */}
+    <div style={{
+      height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      background: 'var(--bg0)', color: 'var(--text1)', fontFamily: F,
+    }}>
+      {/* Header */}
       <div style={{
-        position: 'sticky', top: 0, zIndex: 100,
-        background: 'oklch(21% 0.022 250 / 0.92)', backdropFilter: 'blur(12px)',
+        flexShrink: 0, zIndex: 100,
+        background: 'oklch(21% 0.022 250 / 0.95)', backdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--border)', padding: '0 20px',
         display: 'flex', alignItems: 'center', height: '54px', gap: '12px',
       }}>
@@ -267,7 +302,6 @@ export default function GamePage() {
             </span>
           )}
 
-          {/* Mobile: players toggle */}
           {isMobile && (
             <button onClick={() => setDrawerOpen(true)} style={{
               background: 'var(--bg2)', border: '1px solid var(--border)',
@@ -292,7 +326,7 @@ export default function GamePage() {
                 background: 'transparent', border: '1px solid var(--danger-border)',
                 color: 'var(--danger)', padding: '5px 12px', borderRadius: '7px',
                 cursor: 'pointer', fontFamily: F, fontSize: '12px', fontWeight: 600,
-                display: 'flex', alignItems: 'center', gap: '5px', transition: 'all .15s',
+                display: 'flex', alignItems: 'center', gap: '5px',
               }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
@@ -303,6 +337,106 @@ export default function GamePage() {
           )}
         </div>
       </div>
+
+      {/* Main content row */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+        {/* Article column — only this scrolls */}
+        <div ref={articleScrollRef} style={{
+          flex: 1, overflowY: 'auto', minWidth: 0,
+          padding: isMobile ? '16px 12px 16px' : '20px 24px',
+        }}>
+          <TargetBanner
+            targetTitle={room.target_title ?? ''}
+            startTitle={room.start_title ?? ''}
+            clicks={myPlayer.clicks ?? 0}
+            elapsed={elapsed}
+            hideStats={isMobile}
+          />
+
+          <div style={{ margin: '10px 0' }}>
+            <PathTrail path={myPath} />
+          </div>
+
+          <div style={{
+            background: 'var(--bg1)', border: '1px solid var(--border)',
+            borderRadius: '12px', padding: isMobile ? '20px 16px' : '28px 36px',
+            position: 'relative', minHeight: '300px',
+          }}>
+            {loadingPage && (
+              <div style={{
+                position: 'absolute', inset: 0, background: 'oklch(17% 0.02 250 / 0.8)',
+                borderRadius: '12px', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', zIndex: 10, backdropFilter: 'blur(4px)',
+              }}>
+                <div style={{
+                  width: '20px', height: '20px', borderRadius: '50%',
+                  border: '2px solid var(--border)', borderTopColor: 'var(--accent)',
+                  animation: 'wr-spin .7s linear infinite',
+                }} />
+              </div>
+            )}
+
+            <h1 style={{
+              fontFamily: SERIF, fontSize: isMobile ? '22px' : '26px', color: 'var(--text1)',
+              margin: '0 0 20px', paddingBottom: '14px', borderBottom: '1px solid var(--border)',
+              fontWeight: 600,
+            }}>
+              {pageTitle}
+            </h1>
+
+            {pageHtml && (
+              <WikiArticle
+                title={pageTitle}
+                html={pageHtml}
+                targetUrl={room.target_url ?? ''}
+                onLinkClick={handleLinkClick}
+                disabled={won || gameFinished}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Desktop sidebar */}
+        {!isMobile && (
+          <div style={{
+            width: '256px', flexShrink: 0,
+            borderLeft: '1px solid var(--border)',
+            overflowY: 'auto',
+            padding: '20px 16px',
+          }}>
+            <PlayerList
+              players={players}
+              currentPlayerId={myPlayer.id}
+              startedAt={room.started_at}
+              winCondition={room.win_condition}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Mobile bottom stats bar — flex item, never moves */}
+      {isMobile && (
+        <div style={{
+          flexShrink: 0,
+          background: 'oklch(21% 0.022 250 / 0.97)', borderTop: '1px solid var(--border)',
+          padding: '10px 28px', display: 'flex', justifyContent: 'space-around',
+          backdropFilter: 'blur(10px)',
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', fontFamily: F }}>Clics</div>
+            <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text1)', fontFamily: F, fontVariantNumeric: 'tabular-nums' }}>
+              {myPlayer.clicks ?? 0}
+            </div>
+          </div>
+          <div style={{ width: '1px', background: 'var(--border)', margin: '4px 0' }} />
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', fontFamily: F }}>Temps</div>
+            <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--accent)', fontFamily: F, fontVariantNumeric: 'tabular-nums' }}>
+              {m}:{s}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirm stop modal */}
       {confirmStop && (
@@ -363,16 +497,21 @@ export default function GamePage() {
         </div>
       )}
 
-      {/* Win modal */}
-      {gameFinished && winner && (
+      {/* Win modal :
+          - first/time : dès que gameFinished (tout le monde voit)
+          - clicks     : dès que won===true pour MOI (les autres continuent) */}
+      {((room.win_condition !== 'clicks' && gameFinished && winner) ||
+        (room.win_condition === 'clicks' && won)) && (
         <WinModal
           winner={winner}
           players={players}
           myPlayerId={myPlayer.id}
+          myPath={myPath}
+          myClicks={myPlayer.clicks ?? 0}
           winCondition={room.win_condition}
-          roomCode={code}
           elapsed={elapsed}
-          onReplay={() => router.push(`/room/${code}`)}
+          isWaiting={room.win_condition === 'clicks' && !gameFinished}
+          onLobby={() => router.push(`/room/${code}`)}
           onHome={() => router.push('/')}
         />
       )}
@@ -411,113 +550,26 @@ export default function GamePage() {
           </div>
         </div>
       )}
-
-      {/* Layout */}
-      <div style={{ display: 'flex', maxWidth: '1400px', margin: '0 auto', padding: `0 ${isMobile ? '12px' : '24px'}`, gap: '24px' }}>
-        {/* Main content */}
-        <div style={{ flex: 1, minWidth: 0, paddingTop: '20px', paddingBottom: isMobile ? '80px' : '60px' }}>
-          <TargetBanner
-            targetTitle={room.target_title ?? ''}
-            startTitle={room.start_title ?? ''}
-            clicks={myPlayer.clicks ?? 0}
-            elapsed={elapsed}
-          />
-
-          <div style={{ margin: '10px 0' }}>
-            <PathTrail path={myPlayer.path ?? []} />
-          </div>
-
-          {/* Article card */}
-          <div style={{
-            background: 'var(--bg1)', border: '1px solid var(--border)',
-            borderRadius: '12px', padding: isMobile ? '20px 18px' : '28px 36px',
-            position: 'relative', minHeight: '300px',
-          }}>
-            {loadingPage && (
-              <div style={{
-                position: 'absolute', inset: 0, background: 'oklch(17% 0.02 250 / 0.8)',
-                borderRadius: '12px', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', zIndex: 10, backdropFilter: 'blur(4px)',
-              }}>
-                <div style={{
-                  width: '20px', height: '20px', borderRadius: '50%',
-                  border: '2px solid var(--border)', borderTopColor: 'var(--accent)',
-                  animation: 'wr-spin .7s linear infinite',
-                }} />
-              </div>
-            )}
-
-            <h1 style={{
-              fontFamily: SERIF, fontSize: isMobile ? '22px' : '26px', color: 'var(--text1)',
-              margin: '0 0 20px', paddingBottom: '14px', borderBottom: '1px solid var(--border)',
-              fontWeight: 600,
-            }}>
-              {pageTitle}
-            </h1>
-
-            {pageHtml && (
-              <WikiArticle
-                title={pageTitle}
-                html={pageHtml}
-                targetUrl={room.target_url ?? ''}
-                onLinkClick={handleLinkClick}
-                disabled={won || gameFinished}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Desktop sidebar */}
-        {!isMobile && (
-          <div style={{ width: '256px', flexShrink: 0, paddingTop: '20px' }}>
-            <div style={{ position: 'sticky', top: '74px' }}>
-              <PlayerList
-                players={players}
-                currentPlayerId={myPlayer.id}
-                startedAt={room.started_at}
-                winCondition={room.win_condition}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Mobile sticky bottom stats bar */}
-      {isMobile && (
-        <div style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
-          background: 'oklch(21% 0.022 250 / 0.95)', borderTop: '1px solid var(--border)',
-          padding: '10px 28px', display: 'flex', justifyContent: 'space-around',
-          backdropFilter: 'blur(10px)',
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', fontFamily: F }}>Clics</div>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text1)', fontFamily: F }}>{myPlayer.clicks ?? 0}</div>
-          </div>
-          <div style={{ width: '1px', background: 'var(--border)', margin: '4px 0' }} />
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', fontFamily: F }}>Temps</div>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--accent)', fontFamily: F }}>{m}:{s}</div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
 function WinModal({
-  winner, players, myPlayerId, elapsed, onReplay, onHome,
+  winner, players, myPlayerId, myPath, myClicks, elapsed, isWaiting, onLobby, onHome,
 }: {
-  winner: Player; players: Player[]; myPlayerId: string
-  winCondition: string; roomCode: string; elapsed: number
-  onReplay: () => void; onHome: () => void
+  winner: Player | null; players: Player[]; myPlayerId: string
+  myPath: string[]; myClicks: number; winCondition: string; elapsed: number
+  isWaiting: boolean
+  onLobby: () => void; onHome: () => void
 }) {
-  const iAmWinner = winner.id === myPlayerId
+  const iAmWinner = !isWaiting && winner?.id === myPlayerId
+  const finishedCount = players.filter(p => p.status === 'finished').length
+  const totalCount = players.length
   const sorted = [...players].sort((a, b) => {
+    if (a.status === 'finished' && b.status !== 'finished') return -1
+    if (b.status === 'finished' && a.status !== 'finished') return 1
     if (a.rank !== null && b.rank !== null) return a.rank - b.rank
-    if (a.rank !== null) return -1
-    if (b.rank !== null) return 1
-    return a.clicks - b.clicks
+    return (a.clicks ?? 999) - (b.clicks ?? 999)
   })
 
   return (
@@ -525,27 +577,30 @@ function WinModal({
       position: 'fixed', inset: 0, background: 'oklch(17% 0.02 250 / 0.92)',
       backdropFilter: 'blur(10px)', zIndex: 200,
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
+      overflowY: 'auto',
     }}>
       <div style={{
         background: 'var(--bg1)', border: '1px solid var(--border)',
-        borderRadius: '18px', padding: '40px', maxWidth: '460px', width: '100%',
+        borderRadius: '18px', padding: '36px', maxWidth: '480px', width: '100%',
         textAlign: 'center', boxShadow: '0 24px 80px #00000066', fontFamily: F,
+        margin: 'auto',
       }}>
-        {/* Trophy icon */}
+        {/* Icon */}
         <div style={{
           width: '64px', height: '64px', borderRadius: '18px', margin: '0 auto 18px',
-          background: iAmWinner ? 'var(--warn-bg)' : 'var(--bg2)',
-          border: `1px solid ${iAmWinner ? 'var(--warn-border)' : 'var(--border)'}`,
+          background: isWaiting ? 'var(--accent-bg)' : iAmWinner ? 'var(--warn-bg)' : 'var(--bg2)',
+          border: `1px solid ${isWaiting ? 'var(--accent-border)' : iAmWinner ? 'var(--warn-border)' : 'var(--border)'}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          {iAmWinner ? (
+          {isWaiting ? (
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+          ) : iAmWinner ? (
             <svg width="28" height="28" viewBox="0 0 24 24" fill="var(--warn)" stroke="none">
               <path d="M6 9H2V6h4V4h12v2h4v3h-4c0 2.21-1.79 4-4 4H10c-2.21 0-4-1.79-4-4z"/>
               <path d="M6 9c0 2.21 1.79 4 4 4h4c2.21 0 4-1.79 4-4"/>
-              <path d="M9 13v5"/>
-              <path d="M15 13v5"/>
-              <path d="M7 18h10"/>
-              <path d="M9 22h6"/>
+              <path d="M9 13v5"/><path d="M15 13v5"/><path d="M7 18h10"/>
             </svg>
           ) : (
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -555,12 +610,63 @@ function WinModal({
           )}
         </div>
 
-        <h2 style={{ fontSize: '22px', margin: '0 0 6px', fontWeight: 800, color: iAmWinner ? 'var(--warn)' : 'var(--text1)' }}>
-          {iAmWinner ? 'Tu as gagné !' : `${winner.name} a gagné !`}
-        </h2>
-        <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '24px' }}>
-          {winner.clicks} clics · {formatElapsed(elapsed)}
-        </p>
+        {isWaiting ? (
+          <>
+            <h2 style={{ fontSize: '20px', margin: '0 0 6px', fontWeight: 800, color: 'var(--accent)' }}>
+              Objectif atteint !
+            </h2>
+            <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '20px' }}>
+              {myClicks} clics · en attente des autres ({finishedCount}/{totalCount})
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 style={{ fontSize: '22px', margin: '0 0 6px', fontWeight: 800, color: iAmWinner ? 'var(--warn)' : 'var(--text1)' }}>
+              {iAmWinner ? 'Tu as gagné !' : `${winner?.name} a gagné !`}
+            </h2>
+            <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '20px' }}>
+              {winner?.clicks} clics · {formatElapsed(elapsed)}
+            </p>
+          </>
+        )}
+
+        {/* My path */}
+        {myPath.length > 0 && (
+          <div style={{
+            background: 'var(--bg0)', border: '1px solid var(--border)',
+            borderRadius: '10px', padding: '12px 14px', marginBottom: '16px', textAlign: 'left',
+          }}>
+            <div style={{
+              fontSize: '10px', color: 'var(--text3)', fontWeight: 700,
+              letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '10px',
+            }}>
+              Ton parcours ({myClicks} clics)
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+              {myPath.map((page, i) => {
+                const isLast = i === myPath.length - 1
+                return (
+                  <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{
+                      background: isLast ? 'var(--warn-bg)' : 'var(--bg2)',
+                      border: `1px solid ${isLast ? 'var(--warn-border)' : 'var(--border)'}`,
+                      color: isLast ? 'var(--warn)' : 'var(--text2)',
+                      padding: '3px 8px', borderRadius: '5px',
+                      fontSize: '11px', fontWeight: isLast ? 700 : 500, whiteSpace: 'nowrap',
+                      maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis',
+                      display: 'inline-block',
+                    }}>
+                      {page}
+                    </span>
+                    {i < myPath.length - 1 && (
+                      <span style={{ color: 'var(--border)', fontSize: '12px' }}>›</span>
+                    )}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Classement */}
         <div style={{
@@ -571,10 +677,11 @@ function WinModal({
             padding: '10px 14px', borderBottom: '1px solid var(--border)',
             fontSize: '10px', color: 'var(--text3)', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase',
           }}>
-            Classement final
+            {isWaiting ? `Classement en cours (${finishedCount}/${totalCount})` : 'Classement final'}
           </div>
           {sorted.map((p, i) => {
             const originalIdx = players.findIndex(pl => pl.id === p.id)
+            const isFinished = p.status === 'finished'
             return (
               <div key={p.id} style={{
                 padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px',
@@ -582,37 +689,41 @@ function WinModal({
                 background: p.id === myPlayerId ? 'var(--success-bg)' : 'transparent',
               }}>
                 <span style={{
-                  fontSize: '13px', fontWeight: 700,
-                  color: i === 0 ? 'var(--warn)' : 'var(--text3)', width: '20px',
-                }}>#{i + 1}</span>
+                  fontSize: '13px', fontWeight: 700, width: '20px',
+                  color: !isWaiting && i === 0 ? 'var(--warn)' : isFinished ? 'var(--text2)' : 'var(--text3)',
+                }}>
+                  {isFinished ? `#${i + 1}` : '—'}
+                </span>
                 <Avatar name={p.name} index={originalIdx} size={26} />
                 <span style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: p.id === myPlayerId ? 'var(--success)' : 'var(--text1)' }}>
                   {p.name}
                 </span>
-                <span style={{ fontSize: '12px', color: 'var(--text2)' }}>
-                  {p.status === 'finished' ? `${p.clicks} clics` : 'En cours…'}
+                <span style={{ fontSize: '12px', color: isFinished ? 'var(--text2)' : 'var(--text3)', fontStyle: isFinished ? 'normal' : 'italic' }}>
+                  {isFinished ? `${p.clicks} clics` : 'En cours…'}
                 </span>
               </div>
             )
           })}
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={onHome} style={{
-            flex: 1, background: 'var(--bg2)', border: '1px solid var(--border)',
-            color: 'var(--text1)', padding: '11px', borderRadius: '9px',
-            cursor: 'pointer', fontFamily: F, fontSize: '13px', fontWeight: 600,
-          }}>
-            Accueil
-          </button>
-          <button onClick={onReplay} style={{
-            flex: 1, background: 'var(--success)', border: 'none',
-            color: '#0a0a0a', padding: '11px', borderRadius: '9px',
-            cursor: 'pointer', fontFamily: F, fontSize: '13px', fontWeight: 800,
-          }}>
-            Rejouer
-          </button>
-        </div>
+        {!isWaiting && (
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={onHome} style={{
+              flex: 1, background: 'var(--bg2)', border: '1px solid var(--border)',
+              color: 'var(--text1)', padding: '11px', borderRadius: '9px',
+              cursor: 'pointer', fontFamily: F, fontSize: '13px', fontWeight: 600,
+            }}>
+              Accueil
+            </button>
+            <button onClick={onLobby} style={{
+              flex: 1, background: 'var(--success)', border: 'none',
+              color: '#0a0a0a', padding: '11px', borderRadius: '9px',
+              cursor: 'pointer', fontFamily: F, fontSize: '13px', fontWeight: 800,
+            }}>
+              Retour au lobby
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -621,7 +732,7 @@ function WinModal({
 function LoadingScreen() {
   return (
     <div style={{
-      minHeight: '100vh', background: 'var(--bg0)', display: 'flex',
+      height: '100dvh', background: 'var(--bg0)', display: 'flex',
       alignItems: 'center', justifyContent: 'center',
       fontFamily: "'Manrope',system-ui,sans-serif", color: 'var(--text2)', fontSize: '14px',
     }}>
