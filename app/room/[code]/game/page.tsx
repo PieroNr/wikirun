@@ -342,7 +342,7 @@ export default function GamePage() {
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
         {/* Article column — only this scrolls */}
         <div ref={articleScrollRef} style={{
-          flex: 1, overflowY: 'auto', minWidth: 0,
+          flex: 1, overflowY: 'auto', overflowX: 'hidden', minWidth: 0,
           padding: isMobile ? '16px 12px 16px' : '20px 24px',
         }}>
           <TargetBanner

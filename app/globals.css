@@ -37,6 +37,23 @@ body {
 input::placeholder { color: var(--text3); }
 select option { background: var(--bg1); color: var(--text1); }
 
+/* Contenu Wikipedia : empêche les tableaux/images larges de créer du scroll horizontal */
+.wiki-article img,
+.wiki-article table,
+.wiki-article figure,
+.wiki-article .thumb,
+.wiki-article .wikitable {
+  max-width: 100%;
+  height: auto;
+  overflow-x: auto;
+}
+
+.wiki-article table {
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 @keyframes wr-pulse {
   0%, 100% { box-shadow: 0 0 0 0 var(--warn-glow); }
   50% { box-shadow: 0 0 0 6px transparent; }
