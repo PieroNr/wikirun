@@ -67,9 +67,9 @@ export default function HomePage() {
 
   async function handleCreate() {
     if (!name.trim()) { setError('Entre ton pseudo'); return }
-    if (targetMode === 'custom' && !selectedTarget && !selectedFamous) {
-      setError('Choisis une page cible'); return
-    }
+    const tm = targetMode as string
+    if (tm === 'famous' && !selectedFamous) { setError('Choisis une page célèbre'); return }
+    if (tm === 'custom' && !selectedTarget) { setError('Choisis une page cible'); return }
     setLoading(true); setError(null)
     try {
       let code = ''; let exists = true
@@ -88,9 +88,10 @@ export default function HomePage() {
         const found = FAMOUS_TARGETS.find(t => t.title === selectedFamous)
         target = found ?? randomTarget()
       }
+      const dbTargetMode = targetMode === 'random' ? 'random' : 'custom'
       const { data: room, error: roomErr } = await supabase
         .from('rooms')
-        .insert({ code, host_id: 'pending', status: 'lobby', target_mode: targetMode,
+        .insert({ code, host_id: 'pending', status: 'lobby', target_mode: dbTargetMode,
           target_title: target.title, target_url: target.url, win_condition: winCondition })
         .select().single()
       if (roomErr) throw roomErr
