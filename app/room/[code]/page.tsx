@@ -257,6 +257,14 @@ export default function LobbyPage() {
     setSavingSettings(false)
   }
 
+  async function handleLeave() {
+    if (!myPlayerId || !room) return
+    await supabase.from('players').update({ status: 'disconnected' }).eq('id', myPlayerId)
+    sessionStorage.removeItem('wikiroad_player_id')
+    sessionStorage.removeItem('wikiroad_player_name')
+    router.push('/')
+  }
+
   function copyCode() {
     navigator.clipboard.writeText(code)
     setCopied(true)
@@ -580,16 +588,17 @@ export default function LobbyPage() {
           {isGuest ? null : isHost ? (
             <div>
               {room?.status === 'finished' ? (
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <>
                   <button
                     onClick={handleRestart}
                     disabled={starting}
                     style={{
-                      flex: 1, background: 'var(--success)', color: '#0a0a0a', border: 'none',
+                      width: '100%', background: 'var(--success)', color: '#0a0a0a', border: 'none',
                       padding: '14px', borderRadius: '9px', fontSize: '15px',
                       cursor: starting ? 'not-allowed' : 'pointer',
                       opacity: starting ? 0.6 : 1, fontFamily: F, fontWeight: 800,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                      marginBottom: '10px',
                     }}
                   >
                     {starting ? 'Réinitialisation…' : (
@@ -602,43 +611,51 @@ export default function LobbyPage() {
                       </>
                     )}
                   </button>
-                </div>
+                  <LeaveButton onClick={handleLeave} />
+                </>
               ) : (
-                <button
-                  onClick={handleStart}
-                  disabled={starting || players.length < 1}
-                  style={{
-                    width: '100%', background: 'var(--success)', color: '#0a0a0a', border: 'none',
-                    padding: '14px', borderRadius: '9px', fontSize: '15px',
-                    cursor: starting ? 'not-allowed' : 'pointer',
-                    opacity: starting ? 0.6 : 1, fontFamily: F, fontWeight: 800,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  }}
-                >
-                  {starting ? 'Lancement…' : (
-                    <>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="5 3 19 12 5 21 5 3"/>
-                      </svg>
-                      Lancer la partie ({players.length} joueur{players.length > 1 ? 's' : ''})
-                    </>
+                <>
+                  <button
+                    onClick={handleStart}
+                    disabled={starting || players.length < 1}
+                    style={{
+                      width: '100%', background: 'var(--success)', color: '#0a0a0a', border: 'none',
+                      padding: '14px', borderRadius: '9px', fontSize: '15px',
+                      cursor: starting ? 'not-allowed' : 'pointer',
+                      opacity: starting ? 0.6 : 1, fontFamily: F, fontWeight: 800,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                      marginBottom: '10px',
+                    }}
+                  >
+                    {starting ? 'Lancement…' : (
+                      <>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        Lancer la partie ({players.length} joueur{players.length > 1 ? 's' : ''})
+                      </>
+                    )}
+                  </button>
+                  {players.length < 2 && (
+                    <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', marginBottom: '10px' }}>
+                      Invite des amis pour jouer à plusieurs !
+                    </p>
                   )}
-                </button>
-              )}
-              {room?.status === 'lobby' && players.length < 2 && (
-                <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px', marginTop: '8px' }}>
-                  Invite des amis pour jouer à plusieurs !
-                </p>
+                  <LeaveButton onClick={handleLeave} />
+                </>
               )}
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text2)', fontSize: '14px' }}>
-              <div style={{ marginBottom: '8px' }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                </svg>
+            <div>
+              <div style={{ textAlign: 'center', padding: '16px 20px', color: 'var(--text2)', fontSize: '14px' }}>
+                <div style={{ marginBottom: '8px' }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                </div>
+                En attente que le host lance la partie…
               </div>
-              En attente que le host lance la partie…
+              <LeaveButton onClick={handleLeave} />
             </div>
           )}
 
@@ -703,6 +720,29 @@ const labelSm: React.CSSProperties = {
   fontSize: '10px', color: 'var(--text3)', fontWeight: 700,
   letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px',
   fontFamily: "'Manrope',system-ui,sans-serif",
+}
+
+function LeaveButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%', background: 'transparent', border: '1px solid var(--border)',
+        color: 'var(--text3)', padding: '11px', borderRadius: '9px',
+        cursor: 'pointer', fontFamily: "'Manrope',system-ui,sans-serif",
+        fontSize: '13px', fontWeight: 600,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+        transition: 'all .15s',
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      Quitter la room
+    </button>
+  )
 }
 
 function ConfigItem({ label, value }: { label: string; value: string }) {
