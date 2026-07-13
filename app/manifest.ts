@@ -9,17 +9,22 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: '/',
     display: 'standalone',
     orientation: 'portrait-primary',
-    background_color: '#0d1117',
-    theme_color: '#0d1117',
+    background_color: '#12151c',
+    theme_color: '#12151c',
     categories: ['games', 'entertainment', 'education'],
     lang: 'fr',
     icons: [
       {
+        src: '/icon.svg',
+        sizes: 'any',
+        type: 'image/svg+xml',
+        // @ts-expect-error purpose is valid in the spec
+        purpose: 'any maskable',
+      },
+      {
         src: '/icon',
         sizes: '512x512',
         type: 'image/png',
-        // @ts-expect-error purpose is valid in the spec
-        purpose: 'any maskable',
       },
       {
         src: '/icon',
