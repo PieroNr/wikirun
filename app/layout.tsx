@@ -1,5 +1,6 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
+import { Analytics } from '@vercel/analytics/next'
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://wikiroad.app'
 
@@ -126,6 +127,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         {children}
+        <Analytics />
       </body>
     </html>
   )
