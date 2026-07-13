@@ -47,6 +47,7 @@ export type GameEvent =
   | { type: 'player_finished'; player_id: string; clicks: number; time_ms: number; rank: number }
   | { type: 'game_started'; start_title: string; start_url: string; target_title: string; target_url: string }
   | { type: 'game_finished'; winner_id: string }
+  | { type: 'game_stopped'; stopped_by: string }
   | { type: 'player_joined'; player_id: string; name: string; avatar: string }
   | { type: 'player_left'; player_id: string }
 

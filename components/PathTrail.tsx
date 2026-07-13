@@ -1,6 +1,7 @@
 'use client'
-// components/PathTrail.tsx
 import { useEffect, useRef } from 'react'
+
+const F = "'Manrope',system-ui,sans-serif"
 
 interface Props {
   path: string[]
@@ -19,37 +20,37 @@ export function PathTrail({ path }: Props) {
     <div
       ref={ref}
       style={{
-        display: 'flex', alignItems: 'center', gap: '6px',
-        overflowX: 'auto', padding: '8px 0',
+        display: 'flex', alignItems: 'center', gap: '5px',
+        overflowX: 'auto', padding: '6px 0',
         scrollbarWidth: 'none',
       }}
     >
-      {path.map((page, i) => (
-        <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          <span style={{
-            background: i === path.length - 1 ? '#1c2a3a' : 'transparent',
-            border: i === path.length - 1 ? '1px solid #58a6ff44' : '1px solid #21262d',
-            color: i === path.length - 1 ? '#58a6ff' : '#484f58',
-            padding: '3px 10px', borderRadius: '4px',
-            fontSize: '12px', fontFamily: 'monospace',
-            whiteSpace: 'nowrap', maxWidth: '160px',
-            overflow: 'hidden', textOverflow: 'ellipsis',
-            transition: 'all 0.3s',
-          }}>
-            {page}
+      {path.map((page, i) => {
+        const isLast = i === path.length - 1
+        return (
+          <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+            <span style={{
+              background: isLast ? 'var(--accent-bg)' : 'transparent',
+              border: `1px solid ${isLast ? 'var(--accent-border)' : 'var(--border)'}`,
+              color: isLast ? 'var(--accent)' : 'var(--text3)',
+              padding: '4px 10px', borderRadius: '6px',
+              fontSize: '12px', fontFamily: F, fontWeight: isLast ? 600 : 500,
+              whiteSpace: 'nowrap', maxWidth: '160px',
+              overflow: 'hidden', textOverflow: 'ellipsis',
+              transition: 'all .3s',
+            }}>
+              {page}
+            </span>
+            {!isLast && (
+              <span style={{ color: 'var(--border)', fontSize: '14px', lineHeight: 1 }}>›</span>
+            )}
           </span>
-          {i < path.length - 1 && (
-            <span style={{ color: '#30363d', fontSize: '12px' }}>›</span>
-          )}
-        </span>
-      ))}
+        )
+      })}
     </div>
   )
 }
 
-// ============================================================
-// TargetBanner
-// ============================================================
 interface TargetBannerProps {
   targetTitle: string
   startTitle: string
@@ -63,46 +64,53 @@ export function TargetBanner({ targetTitle, startTitle, clicks, elapsed }: Targe
 
   return (
     <div style={{
-      background: '#0d1117',
-      border: '1px solid #21262d',
-      borderRadius: '10px',
-      padding: '14px 20px',
+      background: 'var(--bg0)', border: '1px solid var(--border)',
+      borderRadius: '12px', padding: '14px 20px',
       display: 'flex', alignItems: 'center',
       justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px',
+      fontFamily: F,
     }}>
-      {/* Cible */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontFamily: 'monospace', fontSize: '10px', color: '#484f58', letterSpacing: '1px', marginBottom: '4px' }}>
-            OBJECTIF
+          <div style={{
+            fontSize: '10px', color: 'var(--text3)', fontWeight: 700,
+            letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '5px',
+          }}>
+            Objectif
           </div>
           <div style={{
-            background: '#1c1a0d', border: '1px solid #f0c04044',
-            color: '#f0c040', padding: '5px 14px', borderRadius: '6px',
-            fontFamily: 'monospace', fontSize: '14px', fontWeight: 'bold',
+            background: 'var(--warn-bg)', border: '1px solid var(--warn-border)',
+            color: 'var(--warn)', padding: '5px 14px', borderRadius: '7px',
+            fontSize: '14px', fontWeight: 700,
+            display: 'flex', alignItems: 'center', gap: '7px',
           }}>
-            🎯 {targetTitle}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="6"/>
+              <circle cx="12" cy="12" r="2" fill="currentColor"/>
+            </svg>
+            {targetTitle}
           </div>
         </div>
 
-        <div style={{ color: '#21262d', fontSize: '18px' }}>·</div>
+        <div style={{ width: '1px', height: '32px', background: 'var(--border)' }} />
 
         <div>
-          <div style={{ fontFamily: 'monospace', fontSize: '10px', color: '#484f58', letterSpacing: '1px', marginBottom: '4px' }}>
-            DÉPART
-          </div>
           <div style={{
-            color: '#8b949e', fontFamily: 'monospace', fontSize: '13px',
+            fontSize: '10px', color: 'var(--text3)', fontWeight: 700,
+            letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '5px',
           }}>
+            Départ
+          </div>
+          <div style={{ color: 'var(--text2)', fontSize: '13px', fontWeight: 500 }}>
             {startTitle}
           </div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'flex', gap: '24px' }}>
-        <Stat label="CLICS" value={String(clicks)} />
-        <Stat label="TEMPS" value={`${m}:${s}`} accent />
+      <div style={{ display: 'flex', gap: '28px' }}>
+        <Stat label="Clics" value={String(clicks)} />
+        <Stat label="Temps" value={`${m}:${s}`} accent />
       </div>
     </div>
   )
@@ -111,12 +119,15 @@ export function TargetBanner({ targetTitle, startTitle, clicks, elapsed }: Targe
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontFamily: 'monospace', fontSize: '10px', color: '#484f58', letterSpacing: '1px' }}>
+      <div style={{
+        fontSize: '10px', color: 'var(--text3)', fontWeight: 700,
+        letterSpacing: '1.2px', textTransform: 'uppercase', fontFamily: F,
+      }}>
         {label}
       </div>
       <div style={{
-        fontFamily: 'monospace', fontSize: '20px', fontWeight: 'bold',
-        color: accent ? '#58a6ff' : '#e6edf3',
+        fontSize: '22px', fontWeight: 700, color: accent ? 'var(--accent)' : 'var(--text1)',
+        fontFamily: F,
       }}>
         {value}
       </div>
