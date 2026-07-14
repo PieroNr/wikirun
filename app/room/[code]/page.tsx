@@ -5,6 +5,7 @@ import { supabase, getRoomChannel } from '@/lib/supabase'
 import { Room, Player, GameEvent, randomAvatar, FAMOUS_TARGETS, WinCondition } from '@/lib/game'
 import { fetchRandomWikiPage, searchWiki } from '@/lib/wiki'
 import { IconFlag, IconClick, IconClock, IconDice, IconStar, IconSearch } from '@/components/icons'
+import RulesCard from '@/components/RulesCard'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 const F = "'Manrope',system-ui,sans-serif"
@@ -584,6 +585,9 @@ export default function LobbyPage() {
             ))}
           </div>
 
+          {/* Rules (collapsible) */}
+          <RulesAccordion />
+
           {/* Actions */}
           {isGuest ? null : isHost ? (
             <div>
@@ -720,6 +724,43 @@ const labelSm: React.CSSProperties = {
   fontSize: '10px', color: 'var(--text3)', fontWeight: 700,
   letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px',
   fontFamily: "'Manrope',system-ui,sans-serif",
+}
+
+function RulesAccordion() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ marginBottom: '16px' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', background: 'var(--bg1)', border: '1px solid var(--border)',
+          color: 'var(--text2)', padding: '12px 16px', borderRadius: open ? '14px 14px 0 0' : '14px',
+          cursor: 'pointer', fontFamily: "'Manrope',system-ui,sans-serif", fontSize: '13px', fontWeight: 600,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          transition: 'border-radius .2s',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Règles du jeu
+        </span>
+        <svg
+          width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }}
+        >
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      {open && (
+        <div style={{ borderRadius: '0 0 14px 14px', overflow: 'hidden', border: '1px solid var(--border)', borderTop: 'none' }}>
+          <RulesCard />
+        </div>
+      )}
+    </div>
+  )
 }
 
 function LeaveButton({ onClick }: { onClick: () => void }) {

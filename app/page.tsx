@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { randomAvatar, randomTarget, FAMOUS_TARGETS, WinCondition, TargetMode } from '@/lib/game'
 import { searchWiki } from '@/lib/wiki'
 import { IconPlus, IconLogin, IconFlag, IconClick, IconClock, IconDice, IconStar, IconSearch } from '@/components/icons'
+import RulesCard from '@/components/RulesCard'
 
 const F = "'Manrope',system-ui,sans-serif"
 
@@ -155,7 +156,7 @@ export default function HomePage() {
       justifyContent: 'center', padding: '24px', fontFamily: F,
     }}>
       {/* Logo */}
-      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <div style={{ display: 'inline-block', marginBottom: '16px' }}>
           <svg viewBox="0 0 32 32" width="56" height="56">
             <rect width="32" height="32" rx="8" fill="#12151c"/>
@@ -172,10 +173,21 @@ export default function HomePage() {
         </p>
       </div>
 
+      {/* Row: rules + card */}
+      <div style={{
+        display: 'flex', gap: '20px', width: '100%', maxWidth: '900px',
+        alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center',
+      }}>
+        {/* Rules */}
+        <div style={{ flex: '1 1 280px', maxWidth: '360px' }}>
+          <RulesCard />
+        </div>
+
       {/* Card */}
       <div style={{
+        flex: '1 1 380px', maxWidth: '480px',
         background: 'var(--bg1)', border: '1px solid var(--border)',
-        borderRadius: '14px', width: '100%', maxWidth: '480px', overflow: 'hidden',
+        borderRadius: '14px', width: '100%', overflow: 'hidden',
       }}>
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
@@ -331,7 +343,8 @@ export default function HomePage() {
             </div>
           )}
         </div>
-      </div>
+        </div>{/* end card */}
+      </div>{/* end row */}
     </div>
   )
 }
