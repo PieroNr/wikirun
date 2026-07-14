@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase, getRoomChannel } from '@/lib/supabase'
 import { Room, Player, GameEvent, formatElapsed } from '@/lib/game'
-import { fetchWikiPage } from '@/lib/wiki'
+import { fetchWikiPage, WikiSection } from '@/lib/wiki'
 import WikiArticle from '@/components/WikiArticle'
 import PlayerList from '@/components/PlayerList'
 import { PathTrail, TargetBanner } from '@/components/PathTrail'
@@ -62,6 +62,7 @@ export default function GamePage() {
   const [stopping, setStopping] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [myPath, setMyPath] = useState<string[]>([])
+  const [sections, setSections] = useState<WikiSection[]>([])
 
   const channelRef = useRef<RealtimeChannel | null>(null)
   const startTimeRef = useRef<number | null>(null)
@@ -100,9 +101,10 @@ export default function GamePage() {
     if (pageToLoad) {
       setLoadingPage(true)
       try {
-        const { html, title } = await fetchWikiPage(pageToLoad)
+        const { html, title, sections: s } = await fetchWikiPage(pageToLoad)
         setPageHtml(html)
         setPageTitle(title)
+        setSections(s)
       } catch { /* silent */ }
       finally { setLoadingPage(false) }
     }
@@ -180,9 +182,10 @@ export default function GamePage() {
     const newClicks = (myPlayer.clicks ?? 0) + 1
     setLoadingPage(true)
     try {
-      const { html, title } = await fetchWikiPage(url)
+      const { html, title, sections: s } = await fetchWikiPage(url)
       setPageHtml(html)
       setPageTitle(title)
+      setSections(s)
 
       const newPath = [...(myPlayer.path ?? []), title]
       const targetUrl = roomRef.current?.target_url ?? ''
@@ -244,6 +247,16 @@ export default function GamePage() {
       if (articleScrollRef.current) articleScrollRef.current.scrollTop = 0
     }
   }, [myPlayer, won, gameFinished, players])
+
+  function scrollToSection(anchor: string) {
+    const container = articleScrollRef.current
+    if (!container) return
+    const el = container.querySelector(`[id="${anchor}"]`) as HTMLElement | null
+    if (el) {
+      const offset = el.offsetTop - 12
+      container.scrollTo({ top: offset, behavior: 'smooth' })
+    }
+  }
 
   async function handleStop() {
     if (!room || !myPlayer?.is_host) return
@@ -340,6 +353,45 @@ export default function GamePage() {
 
       {/* Main content row */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+          {/* TOC sidebar — desktop only, left */}
+        {!isMobile && sections.length > 0 && (
+          <div style={{
+            width: '196px', flexShrink: 0,
+            borderRight: '1px solid var(--border)',
+            overflowY: 'auto', overflowX: 'hidden',
+            padding: '20px 14px',
+          }}>
+            <div style={{
+              fontSize: '10px', color: 'var(--text3)', fontWeight: 700,
+              letterSpacing: '1.2px', textTransform: 'uppercase',
+              marginBottom: '12px', fontFamily: F,
+            }}>
+              Sommaire
+            </div>
+            {sections.map(s => (
+              <button
+                key={s.anchor}
+                onClick={() => scrollToSection(s.anchor)}
+                style={{
+                  display: 'block', width: '100%', background: 'none', border: 'none',
+                  textAlign: 'left', cursor: 'pointer', fontFamily: F,
+                  paddingLeft: `${(s.toclevel - 1) * 12}px`,
+                  paddingTop: '3px', paddingBottom: '3px', paddingRight: 0,
+                  color: 'var(--accent)', fontSize: '12px', lineHeight: 1.45,
+                  transition: 'color .15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--text1)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--accent)')}
+              >
+                <span style={{ color: 'var(--text3)', marginRight: '5px', fontSize: '11px', flexShrink: 0 }}>
+                  {s.number}
+                </span>
+                {s.line}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Article column — only this scrolls */}
         <div ref={articleScrollRef} style={{
           flex: 1, overflowY: 'auto', overflowX: 'hidden', minWidth: 0,

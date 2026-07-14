@@ -70,6 +70,13 @@ export default function WikiArticle({ title, html, targetUrl, onLinkClick, disab
           border-bottom-color: var(--warn) !important;
         }
 
+        .wiki-article a:not(.wiki-link):not(.wiki-link--target) {
+          color: var(--text3);
+          pointer-events: none;
+          cursor: default;
+          text-decoration: none;
+          border: none;
+        }
         .wiki-article a.wiki-link--disabled {
           color: var(--text3);
           pointer-events: none;
@@ -81,7 +88,64 @@ export default function WikiArticle({ title, html, targetUrl, onLinkClick, disab
         .wiki-article .infobox { display: none; }
         .wiki-article .navbox { display: none; }
         .wiki-article .mw-editsection { display: none; }
-        .wiki-article .toc { display: none; }
+
+        /* Sommaire (TOC) */
+        .wiki-article .toc {
+          display: inline-block;
+          background: var(--bg0);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          padding: 14px 18px;
+          margin: 0 0 20px;
+          min-width: 200px;
+          max-width: 100%;
+          font-family: 'Manrope', system-ui, sans-serif;
+        }
+        .wiki-article .toctitle h2 {
+          font-family: 'Manrope', system-ui, sans-serif;
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--text3);
+          letter-spacing: 1.2px;
+          text-transform: uppercase;
+          margin: 0 0 10px;
+          border: none;
+          padding: 0;
+        }
+        .wiki-article .toc ul {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+        }
+        .wiki-article .toc li {
+          margin: 0;
+          padding: 0;
+        }
+        .wiki-article .toc a {
+          color: var(--accent) !important;
+          text-decoration: none !important;
+          border: none !important;
+          font-size: 13px;
+          font-weight: 500;
+          line-height: 2;
+          display: block;
+          padding: 0;
+          cursor: pointer;
+          transition: color .15s;
+        }
+        .wiki-article .toc a:hover { color: var(--text1) !important; }
+        .wiki-article .toc .tocnumber {
+          color: var(--text3);
+          margin-right: 5px;
+          font-size: 12px;
+        }
+        .wiki-article .toc .toclevel-2 { padding-left: 16px; }
+        .wiki-article .toc .toclevel-3 { padding-left: 32px; }
+        .wiki-article .toc .toclevel-4 { padding-left: 48px; }
+        /* Masquer le bouton "masquer" de Wikipedia */
+        .wiki-article .toctogglespan,
+        .wiki-article .toctoggle { display: none; }
+
         .wiki-article .hatnote {
           color: var(--text2);
           font-style: italic;

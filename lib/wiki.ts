@@ -2,10 +2,18 @@
 
 const WIKI_BASE = 'https://fr.wikipedia.org/w/api.php'
 
+export interface WikiSection {
+  toclevel: number
+  number: string
+  line: string
+  anchor: string
+}
+
 export interface WikiPage {
   title: string
   url: string   // slug (ex: "Albert_Einstein")
   html: string
+  sections: WikiSection[]
 }
 
 // Récupère le HTML parsé d'un article Wikipedia FR
@@ -13,11 +21,10 @@ export async function fetchWikiPage(titleOrSlug: string): Promise<WikiPage> {
   const params = new URLSearchParams({
     action: 'parse',
     page: decodeURIComponent(titleOrSlug.replace(/_/g, ' ')),
-    prop: 'text',
+    prop: 'text|sections',
     format: 'json',
     origin: '*',
     disableeditsection: '1',
-    disabletoc: '1',
   })
 
   const res = await fetch(`${WIKI_BASE}?${params}`)
@@ -29,8 +36,14 @@ export async function fetchWikiPage(titleOrSlug: string): Promise<WikiPage> {
   const title: string = data.parse.title
   const html: string = data.parse.text['*']
   const url = title.replace(/ /g, '_')
+  const sections: WikiSection[] = (data.parse.sections ?? []).map((s: Record<string, unknown>) => ({
+    toclevel: s.toclevel as number,
+    number: s.number as string,
+    line: (s.line as string).replace(/<[^>]+>/g, ''),
+    anchor: s.anchor as string,
+  }))
 
-  return { title, url, html }
+  return { title, url, html, sections }
 }
 
 // Récupère une page aléatoire Wikipedia FR (namespace 0 = articles)
